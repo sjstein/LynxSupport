@@ -1,6 +1,8 @@
 
 import anlLynxUtilities as Utilities
 import time
+import configparser
+
 
 RolloverTime=int(0)                #This needs to be clears after a start command.
 ROLLOVERBIT=0x00008000              #The rollover bit
@@ -62,6 +64,17 @@ def outputTlist(td, timeBase, clear, fn):
 f = open('events.csv', 'w+')
 f.write('time(us),event\n')
 
+config = configparser.ConfigParser()
+config.read('listmode.cfg')
+lynx_ip = config['LYNX']['Ip']
+print(f'found ip# {lynx_ip} of type {type(lynx_ip)}')
+lynx_user = config['LYNX']['User']
+lynx_pw = config['LYNX']['Pw']
+det_voltage = config['DETECTOR']['Hv']
+
+
+
+
 try:   
     #Setup the Python env
     Utilities.setup()
@@ -81,14 +94,14 @@ try:
     device = DeviceFactory.createInstance(DeviceFactory.DeviceInterface.IDevice)
         
     #Open a connection to the device
-    device.open("", '192.168.1.122')
+    device.open("", lynx_ip)
     
     #Display the name of the device
     print("You are connected to: %s"%device.getParameter(ParameterCodes.Network_MachineName, 0))
 
     #Gain ownership
 
-    device.lock("aspuser", "nauticas2020", input)
+    device.lock(lynx_user, lynx_pw, input)
 
     #Stop any running acquisition
     device.control(CommandCodes.Stop, input)
