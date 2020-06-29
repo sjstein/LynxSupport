@@ -1,9 +1,11 @@
-import anlLynxUtilities as Utilities
-import time
 import argparse
+import sys
+import os
 
 V_LOW = 0
 V_HIGH = 1000
+
+datatypespath = '\DataTypes' # This is the subdirectory with the Lynx data structure definitions
 
 class IntRange:
     """
@@ -36,15 +38,17 @@ class IntRange:
             return argparse.ArgumentTypeError('Must be an integer')
 
 
-
-parser = argparse.ArgumentParser(description='Program to turn on/off HV supply of Lynx', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser = argparse.ArgumentParser(description='Program to turn on/off HV supply of Lynx',
+                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('lynxIP', help='IP Number of Lynx.')
-parser.add_argument('-s', '--status', help='Return status of HV (ON/OFF)', action='store_true')
+parser.add_argument('-s', '--status', help='Return status of Lynx HV settings and current value', action='store_true')
 parser.add_argument('-o', '--on', help='Turn HV supply ON', action='store_true')
 parser.add_argument('-f', '--off', help='Turn HV supply OFF', action='store_true')
-parser.add_argument('-p', '--polarity', help='HV Polarity [(P)ositive or (N)egative]')
+parser.add_argument('-p', '--polarity', help='HV Polarity [(P)ositive or (N)egative]', type=str,
+                    choices=['P', 'p', 'N', 'n'], default='N')
 parser.add_argument('-v', '--voltage', help=f'HV Voltage value ({V_LOW},{V_HIGH})',
                     type=IntRange(V_LOW, V_HIGH))
+parser.add_argument('-i', '--input', help='MCA input number. 0, 1, or 2', type=IntRange(0, 2), default=1)
 
 # Read arguments passed on command line
 args = parser.parse_args()
@@ -53,63 +57,64 @@ args = parser.parse_args()
 lynxIP = args.lynxIP  # Server IP  - not optional
 
 try:   
-    #Setup the Python env
-    Utilities.setup()
-    
-    #import the device device proxy and other resources
-    from DeviceFactory import *
-    from ParameterCodes import *
-    from CommandCodes import *
-    from ParameterTypes import *
-    from ListData import *
+    # Setup the Python env
+    sys.path.append(os.getcwd()+datatypespath)  # append DataTypes subdir to system path for Lynx library imports
+    from DeviceFactory import DeviceFactory
+    from ParameterCodes import ParameterCodes
 
-    if args.status == True:  # Requesting status
-        status = True
-        print(f'Status function not implemented at this point')
-        exit()
+    mca_input = args.input
 
-
-    #Working with input 1
-    input = 1
-    
-    #Create the interface
+    # Instantiate the device object
     device = DeviceFactory.createInstance(DeviceFactory.DeviceInterface.IDevice)
         
-    #Open a connection to the device
-    device.open("", lynxIP)
-    
-    #Display the name of the device
-    print("You are connected to: %s"%device.getParameter(ParameterCodes.Network_MachineName, 0))
+    # Open a connection to the device
+    device.open('', lynxIP)
 
-    #Gain ownership
+    # Get device name
+    dev_name = device.getParameter(ParameterCodes.Network_MachineName, 0)
 
-    device.lock("Administrator", "Password", input)
+    # Gain ownership
+    # BARF on this hard-coded horror. However this will remain until Canberra responds with a reasonable way
+    #  for us to take control as a user instead of always admin
+    device.lock('Administrator', 'Password', mca_input)
 
-    #Stop any running acquisition
-    device.control(CommandCodes.Stop, input)
-    device.control(CommandCodes.Abort, input)
-
-    #Setup the HVPS
-    #Utilities.setupHVPS(device)
-
-    # HV_Value = 650
     if args.voltage is not None:
-        print(f'Setting HV magnitude to {args.voltage}V')
-        device.setParameter(ParameterCodes.Input_Voltage, args.voltage, input)
+        print(f'{dev_name}: Setting HV magnitude to {args.voltage}V')
+        device.setParameter(ParameterCodes.Input_Voltage, args.voltage, mca_input)
         exit()
 
-    # Set HV magnitude
-   # device.setParameter(ParameterCodes.Input_Voltage, HV_Value, input)
-    if args.on == True:
-        print(f'Turning HV supply ON')
-        device.setParameter(ParameterCodes.Input_VoltageStatus, True, input)
+    if args.polarity is not None:
+        if args.polarity.upper() == 'P':
+            print('{dev_name}: Setting HV polarity to POSITIVE')
+            device.setParameter(ParameterCodes.Input_VoltagePolarity, False, mca_input)
+        else:
+            print('{dev_name}: Setting HV polarity to NEGATIVE')
+            device.setParameter(ParameterCodes.Input_VoltagePolarity, True, mca_input)
+
+    if args.on:
+        print(f'{dev_name}: Turning HV supply ON')
+        device.setParameter(ParameterCodes.Input_VoltageStatus, True, mca_input)
         exit()
 
-    if args.off == True:
-        print(f'Turning HV supply OFF')
-        device.setParameter(ParameterCodes.Input_VoltageStatus, False, input)
+    if args.off:
+        print(f'{dev_name}: Turning HV supply OFF')
+        device.setParameter(ParameterCodes.Input_VoltageStatus, False, mca_input)
+        exit()
+
+    if args.status:
+        hv_set = device.getParameter(ParameterCodes.Input_Voltage, mca_input)
+        hv_read = round(device.getParameter(ParameterCodes.Input_VoltageReading, mca_input), 2)
+        if device.getParameter(ParameterCodes.Input_VoltagePolarity, mca_input): # Returns True if negative
+            hv_polarity = '-'
+        else:
+            hv_polarity = '+'
+        if device.getParameter(ParameterCodes.Input_VoltageStatus, mca_input):
+            hv_status = 'ON'
+        else:
+            hv_status = 'OFF'
+        print(f'{dev_name}: HV Supply is {hv_status} and set to {hv_polarity}{hv_set}, reading back {hv_read}V')
         exit()
 
 except Exception as e:
-    #Handle any exceptions
-    Utilities.dumpException(e)
+    # Handle any exceptions
+    print(f'Exception caught : {e}')
