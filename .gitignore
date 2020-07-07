@@ -1,5 +1,6 @@
-DataTypes
+DataTypes/
 *.csv
 __*
 Utilities.py
-
+*-2020/
+.idea
