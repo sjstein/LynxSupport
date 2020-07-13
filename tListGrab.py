@@ -1,9 +1,14 @@
 import anlLynxUtilities as Utilities
+import argparse
 import configparser
 import os
 import time
 
 from datetime import datetime
+
+from aspLibs.aspUtilities import IntRange
+from aspLibs.aspUtilities import V_NONE, V_HIGH
+from aspLibs.aspUtilities import AspLogger
 
 # Clear counters and set up constants
 RolloverTime = 0
@@ -61,19 +66,23 @@ def output_tlist(td, time_base, clear, fn):
             RolloverTime = tc_msb | tc_lsb  # Adjust our clock for larger time
             continue  # goto next event, do not record this rollover
 
-        #       print(f'Event:{event_nbr} at {event_time * time_conversion} (uS)')
         fn.write(f'{round(event_time * time_conversion, 1)},{event_nbr}\n')
         time_acc += event_dt & ROLLOVERMASK
-    #       print(f'time_acc = {time_acc}')
     return nbr_events  # Indicate the number of events processed
-
-
 # End function definition
 
 
+parser = argparse.ArgumentParser(description='Python script to configure and take listmode data from a LYNX MCA.',
+                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument('-c', '--config', help='Name of configuration file.', default=config_file)
+parser.add_argument('-v', '--verbosity', help=f'Verbosity level {V_NONE} (silent) to {V_HIGH} (most verbose).',
+                    type=IntRange(V_NONE, V_HIGH), default=V_HIGH)
+args = parser.parse_args()
+log = AspLogger(args.verbosity)
+
 # Parse config file
 config = configparser.ConfigParser()
-config.read(config_file)
+config.read(args.config)
 lynx_ip = config['LYNX']['Ip']
 lynx_user = config['LYNX']['User']
 lynx_pw = config['LYNX']['Pw']
@@ -83,6 +92,11 @@ acq_mode = config['DETECTOR']['Time_Type']
 file_pre = config['DATA']['File_Pre']
 file_post = config['DATA']['File_Post']
 file_chunk = config['DATA']['File_Chunk']
+det_name = config['DETECTOR']['Name']
+det_serial = config['DETECTOR']['Sn']
+file_note1 = config['DATA']['File_Note1']
+file_note2 = config['DATA']['File_Note2']
+
 
 # Set up file naming structure
 # Time and date strings for filename
@@ -107,15 +121,15 @@ try:
 
     device = DeviceFactory.createInstance(DeviceFactory.DeviceInterface.IDevice)  # Create the interface
     device.open("", lynx_ip)  # Open connection
-    print(f'Connected to: {device.getParameter(ParameterCodes.Network_MachineName, 0)}')
+    log.info(f'Connected to: {device.getParameter(ParameterCodes.Network_MachineName, 0)}')
     device.lock(lynx_user, lynx_pw, LYNXINPUT)  # Take over ownership of device
     device.control(CommandCodes.Stop, LYNXINPUT)  # Stop any running acquisition
     device.control(CommandCodes.Abort, LYNXINPUT)
     device.setParameter(ParameterCodes.Input_Voltage, det_voltage, LYNXINPUT)  # Set HV magnitude
     device.setParameter(ParameterCodes.Input_VoltageStatus, POLARITY_NEG, LYNXINPUT)  # Turn on HV
     while device.getParameter(ParameterCodes.Input_VoltageRamping, LYNXINPUT) is True:  # Wait for HV to ramp
-        print('HVPS is ramping...')
-        time.sleep(.2)
+        log.warn('HVPS is ramping...')
+        time.sleep(.5)
     device.setParameter(ParameterCodes.Input_Mode, InputModes.Tlist, LYNXINPUT)  # set Tlist acquisition mode
     device.setParameter(ParameterCodes.Input_ExternalSyncStatus, 0, LYNXINPUT)  # Disable external sync
     if acq_mode == 'Live':  # Set up acquisition time and type
@@ -129,22 +143,38 @@ try:
     iteration = 0
     total_events = 0
 
-    # Create archive file
+
     path = f'./{datestr}'
     if not os.path.isdir(path):
         os.mkdir(path)
+
+    # Create info file
+    iname = f'./{datestr}/{file_pre}_{timestr}_INFO.txt'  # File contains info for this run
+    if os.path.isfile(iname):
+        log.erro(f'info file "{iname}" already exists')
+        exit(-1)
+    ifile = open(iname, 'w')
+    log.info(f'Opening info file : {iname}')
+    ifile.write(f'{file_note1}\n')
+    ifile.write(f'{file_note2}\n')
+    ifile.write(f'Detector: {det_name}, s/n: {det_serial}, voltage: {det_voltage}\n')
+    ifile.write('Files written:\n')
+    ifile.close()   # No need to leave open until writing data
+
+    # Create archive file
     fname = f'./{datestr}/{file_pre}_{timestr}_{file_nbr}.{file_post}'
     if os.path.isfile(fname):
-        print(f'ERROR: file "{fname}" already exists')
+        log.erro(f'archive file "{fname}" already exists')
         exit(-1)
     f = open(fname, 'w')
-    print(f'Opening file : {fname}')
+    log.info(f'Opening archive file : {fname}')
     f.write('time(us),event\n')
+    # Leaving the archive file open as it is written so frequently
+    # Perhaps not the best idea?
 
     # Continually poll device and display information while it is acquiring
     while True:
         iteration += 1
-        #      print(f'Iteration # {iteration}')
         # Get the status (see ./DataTypes/ParameterTypes.py for enumerations
         status = device.getParameter(ParameterCodes.Input_Status, LYNXINPUT)
         if (status & StatusBits.Busy) == 0 and (status & StatusBits.Waiting) == 0:
@@ -156,29 +186,37 @@ try:
 
         # Get the list data
         t_list = device.getListData(LYNXINPUT)
-        #    print(f'Printing info for list state: {t_list}')
-        #    print(f'Start time (uS): {t_list.getStartTime()}')
-        #    print(f'Live time (uS): {t_list.getLiveTime()}')
-        #    print(f'Real time (uS): {t_list.getRealTime()}')
-        #    print(f'Timebase (nS?): {t_list.getTimebase()}')
-        #    print(f'Flags: {t_list.getFlags()}')
+        log.disp(f'Start time: {t_list.getStartTime()}')
+        if acq_mode == 'Live':
+            log.disp(f'Live time (s): {t_list.getLiveTime() / 1e6}')
+        else:
+            log.disp(f'Real time (s): {t_list.getRealTime() / 1e6}')
+        log.disp(f'Flags: {t_list.getFlags()}')
+
         # archive the events
         events_processed = output_tlist(t_list, t_list.getTimebase(), False, f)
+        log.disp(f'Events: {events_processed}')
         file_events += events_processed
         total_events += events_processed
-
         if (file_events > float(file_chunk)) & (float(file_chunk) != -1):  # Time to start a new file
             f.write(f'Total events processed: {file_events}')
-            file_events = 0
-            file_nbr += 1
+            ifile = open(iname, 'a')
+            ifile.write(f'{fname } ({file_events} events)\n')    # Record file info
+            ifile.close()
             f.close()
+            file_nbr += 1
             fname = f'./{datestr}/{file_pre}_{timestr}_{file_nbr}.{file_post}'
-            print(f'Starting new file ({fname}) after writing {file_events} events')
+            log.info(f'Starting new file ({fname}) after writing {file_events} events')
+            file_events = 0
             f = open(fname, 'w')
             f.write('time(us),event\n')
 
-    print(f'Acquisition complete : total events = {total_events}')
+    log.info(f'Acquisition complete : total events = {total_events}')
+    ifile = open(iname, 'a')
+    ifile.write(f'{fname} ({file_events} events)\n')  # Record file info
+    ifile.write(f'A total of {total_events} events archived.\n')
     f.close()
+    ifile.close()
 
 except Exception as e:
     Utilities.dumpException(e)

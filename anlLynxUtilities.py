@@ -82,7 +82,7 @@ def setup():
     """
 
     #  toolkitPath = os.getcwd().replace(os.path.sep+"Examples", os.path.sep+"DataTypes")
-    sys.path.append(os.getcwd()+'\DataTypes')
+    sys.path.append(os.getcwd()+'\\DataTypes')
     
 def readLine(txt):
     """
