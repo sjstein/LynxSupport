@@ -1,0 +1,3 @@
+[submodule "aspLibs"]
+	path = aspLibs
+	url = https://github.com/sjstein/aspLibs
