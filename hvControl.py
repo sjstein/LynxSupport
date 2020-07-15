@@ -13,7 +13,7 @@ datatypespath = '\\DataTypes'  # This is the subdirectory with the Lynx data str
 
 parser = argparse.ArgumentParser(description='Program to turn on/off HV supply of Lynx',
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-
+parser.add_argument('lynxIP', help='IP Number of Lynx.')
 parser.add_argument('-s', '--status', help='Return status of Lynx HV settings and current value', action='store_true')
 parser.add_argument('-o', '--on', help='Turn HV supply ON', action='store_true')
 parser.add_argument('-f', '--off', help='Turn HV supply OFF', action='store_true')
