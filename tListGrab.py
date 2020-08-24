@@ -20,6 +20,7 @@ LYNXINPUT = 1  # Memory bank 1 (MCA)
 POLARITY_NEG = True
 POLARITY_POS = False
 LYNXMEMORYGROUP = 1
+COL_HEADER = 'T_us,ch\n'
 
 
 def output_tlist(td, time_base, clear, fn):
@@ -101,10 +102,10 @@ file_note2 = config['DATA']['File_Note2']
 # Set up file naming structure
 # Time and date strings for filename
 now = datetime.now()
-datestr = now.strftime('%d-%b-%Y')
+datestr = now.strftime('%Y%m%d')
 timestr = now.strftime('%H%M')
 
-file_nbr = 0  # Counter to keep track of file number
+file_nbr = 1  # Counter to keep track of file number
 file_events = 0  # Counter to keep track of events written in each file
 
 # Main loop
@@ -143,13 +144,12 @@ try:
     iteration = 0
     total_events = 0
 
-
-    path = f'./{datestr}'
+    path = f'./Data/{datestr}'
     if not os.path.isdir(path):
         os.mkdir(path)
 
     # Create info file
-    iname = f'./{datestr}/{file_pre}_{timestr}_INFO.txt'  # File contains info for this run
+    iname = f'./{datestr}/logInfo_{file_pre}_{datestr}_{timestr}.txt'
     if os.path.isfile(iname):
         log.erro(f'info file "{iname}" already exists')
         exit(-1)
@@ -162,13 +162,13 @@ try:
     ifile.close()   # No need to leave open until writing data
 
     # Create archive file
-    fname = f'./{datestr}/{file_pre}_{timestr}_{file_nbr}.{file_post}'
+    fname = f'./{datestr}/{file_pre}_{datestr}_{timestr}_{file_nbr}.{file_post}'
     if os.path.isfile(fname):
         log.erro(f'archive file "{fname}" already exists')
         exit(-1)
     f = open(fname, 'w')
     log.info(f'Opening archive file : {fname}')
-    f.write('time(us),event\n')
+    f.write(COL_HEADER)
     # Leaving the archive file open as it is written so frequently
     # Perhaps not the best idea?
 
@@ -199,17 +199,16 @@ try:
         file_events += events_processed
         total_events += events_processed
         if (file_events > float(file_chunk)) & (float(file_chunk) != -1):  # Time to start a new file
-            f.write(f'Total events processed: {file_events}')
             ifile = open(iname, 'a')
             ifile.write(f'{fname } ({file_events} events)\n')    # Record file info
             ifile.close()
             f.close()
             file_nbr += 1
-            fname = f'./{datestr}/{file_pre}_{timestr}_{file_nbr}.{file_post}'
+            fname = f'./{datestr}/{file_pre}_{datestr}_{timestr}_{file_nbr}.{file_post}'
             log.info(f'Starting new file ({fname}) after writing {file_events} events')
             file_events = 0
             f = open(fname, 'w')
-            f.write('time(us),event\n')
+            f.write(COL_HEADER)
 
     log.info(f'Acquisition complete : total events = {total_events}')
     ifile = open(iname, 'a')
