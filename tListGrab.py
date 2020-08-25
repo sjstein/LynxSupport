@@ -21,7 +21,7 @@ POLARITY_NEG = True
 POLARITY_POS = False
 LYNXMEMORYGROUP = 1
 COL_HEADER = 'T_us,ch\n'
-DATA_DIR = '.\Data'     # Subdirectory into which data is stored
+DATA_DIR = './Data'     # Subdirectory into which data is stored
 
 
 def output_tlist(td, time_base, clear, fn):
@@ -78,7 +78,7 @@ parser = argparse.ArgumentParser(description='Python script to configure and tak
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-c', '--config', help='Name of configuration file.', default=config_file)
 parser.add_argument('-v', '--verbosity', help=f'Verbosity level {V_NONE} (silent) to {V_HIGH} (most verbose).',
-                    type=IntRange(V_NONE, V_HIGH), default=V_HIGH)
+                    type=IntRange(V_NONE, V_HIGH), default=2)
 args = parser.parse_args()
 log = AspLogger(args.verbosity)
 
@@ -145,6 +145,10 @@ try:
     iteration = 0
     total_events = 0
 
+    # Read energy coefficients for archiving
+    energy_offset = device.getParameter(ParameterCodes.Calibrations_Energy_Offset, LYNXINPUT)
+    energy_slope = device.getParameter(ParameterCodes.Calibrations_Energy_Slope, LYNXINPUT)
+
     # Create subdirectories for data archiving
     if not os.path.isdir(DATA_DIR):
         os.mkdir(DATA_DIR)
@@ -159,10 +163,11 @@ try:
         exit(-1)
     ifile = open(iname, 'w')
     log.info(f'Opening info file : {iname}')
-    ifile.write(f'{file_note1}\n')
-    ifile.write(f'{file_note2}\n')
+    ifile.write(f'Note 1: {file_note1}\n')
+    ifile.write(f'Note 2: {file_note2}\n')
     ifile.write(f'Detector: {det_name}, s/n: {det_serial}, voltage: {det_voltage}\n')
-    ifile.write('Files written:\n')
+    ifile.write(f'Calibration: {energy_offset} {energy_slope}\n')
+    ifile.write('Files written:\n--------------\n')
     ifile.close()   # No need to leave open until writing data
 
     # Create archive file
@@ -207,7 +212,7 @@ try:
             ifile.close()
             f.close()
             file_nbr += 1
-            fname = f'./{datestr}/{file_pre}_{datestr}_{timestr}_{file_nbr}.{file_post}'
+            fname = f'{data_path}/{file_pre}_{datestr}_{timestr}_{file_nbr}.{file_post}'
             log.info(f'Starting new file ({fname}) after writing {file_events} events')
             file_events = 0
             f = open(fname, 'w')
@@ -215,7 +220,7 @@ try:
 
     log.info(f'Acquisition complete : total events = {total_events}')
     ifile = open(iname, 'a')
-    ifile.write(f'{fname} ({file_events} events)\n')  # Record file info
+    ifile.write(f'{fname} ({file_events} events)\n--------------\n')  # Record file info
     ifile.write(f'A total of {total_events} events archived.\n')
     f.close()
     ifile.close()
