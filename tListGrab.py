@@ -21,7 +21,7 @@ POLARITY_NEG = True
 POLARITY_POS = False
 LYNXMEMORYGROUP = 1
 COL_HEADER = 'T_us,ch\n'
-DATA_DIR = '.\Data'     # Subdirectory into which data is stored
+DATA_DIR = './Data'     # Subdirectory into which data is stored
 
 
 def output_tlist(td, time_base, clear, fn):
@@ -163,11 +163,11 @@ try:
         exit(-1)
     ifile = open(iname, 'w')
     log.info(f'Opening info file : {iname}')
-    ifile.write(f'{file_note1}\n')
-    ifile.write(f'{file_note2}\n')
+    ifile.write(f'Note 1: {file_note1}\n')
+    ifile.write(f'Note 2: {file_note2}\n')
     ifile.write(f'Detector: {det_name}, s/n: {det_serial}, voltage: {det_voltage}\n')
-    ifile.write(f'Calibration {energy_offset} {energy_slope}\n')
-    ifile.write('Files written:\n')
+    ifile.write(f'Calibration: {energy_offset} {energy_slope}\n')
+    ifile.write('Files written:\n--------------\n')
     ifile.close()   # No need to leave open until writing data
 
     # Create archive file
@@ -220,7 +220,7 @@ try:
 
     log.info(f'Acquisition complete : total events = {total_events}')
     ifile = open(iname, 'a')
-    ifile.write(f'{fname} ({file_events} events)\n')  # Record file info
+    ifile.write(f'{fname} ({file_events} events)\n--------------\n')  # Record file info
     ifile.write(f'A total of {total_events} events archived.\n')
     f.close()
     ifile.close()
