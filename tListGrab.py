@@ -145,6 +145,10 @@ try:
     iteration = 0
     total_events = 0
 
+    # Read energy coefficients for archiving
+    energy_offset = device.getParameter(ParameterCodes.Calibrations_Energy_Offset, LYNXINPUT)
+    energy_slope = device.getParameter(ParameterCodes.Calibrations_Energy_Slope, LYNXINPUT)
+
     # Create subdirectories for data archiving
     if not os.path.isdir(DATA_DIR):
         os.mkdir(DATA_DIR)
@@ -162,6 +166,7 @@ try:
     ifile.write(f'{file_note1}\n')
     ifile.write(f'{file_note2}\n')
     ifile.write(f'Detector: {det_name}, s/n: {det_serial}, voltage: {det_voltage}\n')
+    ifile.write(f'Calibration {energy_offset} {energy_slope}\n')
     ifile.write('Files written:\n')
     ifile.close()   # No need to leave open until writing data
 
