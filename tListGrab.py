@@ -21,6 +21,7 @@ POLARITY_NEG = True
 POLARITY_POS = False
 LYNXMEMORYGROUP = 1
 COL_HEADER = 'T_us,ch\n'
+DATA_DIR = '.\Data'     # Subdirectory into which data is stored
 
 
 def output_tlist(td, time_base, clear, fn):
@@ -144,12 +145,15 @@ try:
     iteration = 0
     total_events = 0
 
-    path = f'./Data/{datestr}'
-    if not os.path.isdir(path):
-        os.mkdir(path)
+    # Create subdirectories for data archiving
+    if not os.path.isdir(DATA_DIR):
+        os.mkdir(DATA_DIR)
+    data_path = f'{DATA_DIR}/{datestr}'
+    if not os.path.isdir(data_path):
+        os.mkdir(data_path)
 
     # Create info file
-    iname = f'./{datestr}/logInfo_{file_pre}_{datestr}_{timestr}.txt'
+    iname = f'{data_path}/logInfo_{file_pre}_{datestr}_{timestr}.txt'
     if os.path.isfile(iname):
         log.erro(f'info file "{iname}" already exists')
         exit(-1)
@@ -162,7 +166,7 @@ try:
     ifile.close()   # No need to leave open until writing data
 
     # Create archive file
-    fname = f'./{datestr}/{file_pre}_{datestr}_{timestr}_{file_nbr}.{file_post}'
+    fname = f'{data_path}/{file_pre}_{datestr}_{timestr}_{file_nbr}.{file_post}'
     if os.path.isfile(fname):
         log.erro(f'archive file "{fname}" already exists')
         exit(-1)
@@ -179,7 +183,6 @@ try:
         status = device.getParameter(ParameterCodes.Input_Status, LYNXINPUT)
         if (status & StatusBits.Busy) == 0 and (status & StatusBits.Waiting) == 0:
             # No longer acquiring data - time to exit
-            f.write(f'Total events processed: {file_events}')
             break
         fault = device.getParameter(ParameterCodes.Input_Fault, LYNXINPUT)
         # Not sure if we should act on a fault or not - TBD
