@@ -78,7 +78,7 @@ parser = argparse.ArgumentParser(description='Python script to configure and tak
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-c', '--config', help='Name of configuration file.', default=config_file)
 parser.add_argument('-v', '--verbosity', help=f'Verbosity level {V_NONE} (silent) to {V_HIGH} (most verbose).',
-                    type=IntRange(V_NONE, V_HIGH), default=V_HIGH)
+                    type=IntRange(V_NONE, V_HIGH), default=2)
 args = parser.parse_args()
 log = AspLogger(args.verbosity)
 
@@ -212,7 +212,7 @@ try:
             ifile.close()
             f.close()
             file_nbr += 1
-            fname = f'./{datestr}/{file_pre}_{datestr}_{timestr}_{file_nbr}.{file_post}'
+            fname = f'{data_path}/{file_pre}_{datestr}_{timestr}_{file_nbr}.{file_post}'
             log.info(f'Starting new file ({fname}) after writing {file_events} events')
             file_events = 0
             f = open(fname, 'w')
