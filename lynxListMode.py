@@ -8,6 +8,7 @@ from datetime import datetime
 
 from aspLibs.aspUtilities import IntRange
 from aspLibs.aspUtilities import V_NONE, V_HIGH
+from aspLibs.aspUtilities import DATA_DIR
 from aspLibs.aspUtilities import AspLogger
 
 # Clear counters and set up constants
@@ -21,7 +22,6 @@ POLARITY_NEG = True
 POLARITY_POS = False
 LYNXMEMORYGROUP = 1
 COL_HEADER = 'T_us,ch\n'
-DATA_DIR = './Data'     # Subdirectory into which data is stored
 
 
 def output_tlist(td, time_base, clear, fn):
