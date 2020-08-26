@@ -8,6 +8,7 @@ from datetime import datetime
 
 from aspLibs.aspUtilities import IntRange
 from aspLibs.aspUtilities import V_NONE, V_HIGH
+from aspLibs.aspUtilities import DATA_DIR
 from aspLibs.aspUtilities import AspLogger
 
 # Clear counters and set up constants
@@ -20,6 +21,7 @@ LYNXINPUT = 1  # Memory bank 1 (MCA)
 POLARITY_NEG = True
 POLARITY_POS = False
 LYNXMEMORYGROUP = 1
+COL_HEADER = 'T_us,ch\n'
 
 
 def output_tlist(td, time_base, clear, fn):
@@ -76,7 +78,7 @@ parser = argparse.ArgumentParser(description='Python script to configure and tak
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-c', '--config', help='Name of configuration file.', default=config_file)
 parser.add_argument('-v', '--verbosity', help=f'Verbosity level {V_NONE} (silent) to {V_HIGH} (most verbose).',
-                    type=IntRange(V_NONE, V_HIGH), default=V_HIGH)
+                    type=IntRange(V_NONE, V_HIGH), default=2)
 args = parser.parse_args()
 log = AspLogger(args.verbosity)
 
@@ -101,10 +103,10 @@ file_note2 = config['DATA']['File_Note2']
 # Set up file naming structure
 # Time and date strings for filename
 now = datetime.now()
-datestr = now.strftime('%d-%b-%Y')
+datestr = now.strftime('%Y%m%d')
 timestr = now.strftime('%H%M')
 
-file_nbr = 0  # Counter to keep track of file number
+file_nbr = 1  # Counter to keep track of file number
 file_events = 0  # Counter to keep track of events written in each file
 
 # Main loop
@@ -143,32 +145,39 @@ try:
     iteration = 0
     total_events = 0
 
+    # Read energy coefficients for archiving
+    energy_offset = device.getParameter(ParameterCodes.Calibrations_Energy_Offset, LYNXINPUT)
+    energy_slope = device.getParameter(ParameterCodes.Calibrations_Energy_Slope, LYNXINPUT)
 
-    path = f'./{datestr}'
-    if not os.path.isdir(path):
-        os.mkdir(path)
+    # Create subdirectories for data archiving
+    if not os.path.isdir(DATA_DIR):
+        os.mkdir(DATA_DIR)
+    data_path = f'{DATA_DIR}/{datestr}'
+    if not os.path.isdir(data_path):
+        os.mkdir(data_path)
 
     # Create info file
-    iname = f'./{datestr}/{file_pre}_{timestr}_INFO.txt'  # File contains info for this run
+    iname = f'{data_path}/logInfo_{file_pre}_{datestr}_{timestr}.txt'
     if os.path.isfile(iname):
         log.erro(f'info file "{iname}" already exists')
         exit(-1)
     ifile = open(iname, 'w')
     log.info(f'Opening info file : {iname}')
-    ifile.write(f'{file_note1}\n')
-    ifile.write(f'{file_note2}\n')
+    ifile.write(f'Note 1: {file_note1}\n')
+    ifile.write(f'Note 2: {file_note2}\n')
     ifile.write(f'Detector: {det_name}, s/n: {det_serial}, voltage: {det_voltage}\n')
-    ifile.write('Files written:\n')
+    ifile.write(f'Calibration: {energy_offset} {energy_slope}\n')
+    ifile.write('Files written:\n--------------\n')
     ifile.close()   # No need to leave open until writing data
 
     # Create archive file
-    fname = f'./{datestr}/{file_pre}_{timestr}_{file_nbr}.{file_post}'
+    fname = f'{data_path}/{file_pre}_{datestr}_{timestr}_{file_nbr}.{file_post}'
     if os.path.isfile(fname):
         log.erro(f'archive file "{fname}" already exists')
         exit(-1)
     f = open(fname, 'w')
     log.info(f'Opening archive file : {fname}')
-    f.write('time(us),event\n')
+    f.write(COL_HEADER)
     # Leaving the archive file open as it is written so frequently
     # Perhaps not the best idea?
 
@@ -179,7 +188,6 @@ try:
         status = device.getParameter(ParameterCodes.Input_Status, LYNXINPUT)
         if (status & StatusBits.Busy) == 0 and (status & StatusBits.Waiting) == 0:
             # No longer acquiring data - time to exit
-            f.write(f'Total events processed: {file_events}')
             break
         fault = device.getParameter(ParameterCodes.Input_Fault, LYNXINPUT)
         # Not sure if we should act on a fault or not - TBD
@@ -199,21 +207,20 @@ try:
         file_events += events_processed
         total_events += events_processed
         if (file_events > float(file_chunk)) & (float(file_chunk) != -1):  # Time to start a new file
-            f.write(f'Total events processed: {file_events}')
             ifile = open(iname, 'a')
             ifile.write(f'{fname } ({file_events} events)\n')    # Record file info
             ifile.close()
             f.close()
             file_nbr += 1
-            fname = f'./{datestr}/{file_pre}_{timestr}_{file_nbr}.{file_post}'
+            fname = f'{data_path}/{file_pre}_{datestr}_{timestr}_{file_nbr}.{file_post}'
             log.info(f'Starting new file ({fname}) after writing {file_events} events')
             file_events = 0
             f = open(fname, 'w')
-            f.write('time(us),event\n')
+            f.write(COL_HEADER)
 
     log.info(f'Acquisition complete : total events = {total_events}')
     ifile = open(iname, 'a')
-    ifile.write(f'{fname} ({file_events} events)\n')  # Record file info
+    ifile.write(f'{fname} ({file_events} events)\n--------------\n')  # Record file info
     ifile.write(f'A total of {total_events} events archived.\n')
     f.close()
     ifile.close()
