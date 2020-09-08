@@ -14,7 +14,7 @@ from aspLibs.aspUtilities import AspLogger
 # Clear counters and set up constants
 RolloverTime = 0
 time_acc = 0
-config_file = 'listmode.cfg'
+config_file = 'lynxlistmode.cfg'
 ROLLOVERBIT = 0x8000
 ROLLOVERMASK = 0x7fff
 LYNXINPUT = 1  # Memory bank 1 (MCA)
@@ -91,14 +91,13 @@ lynx_pw = config['LYNX']['Pw']
 det_voltage = config['DETECTOR']['Hv']
 acq_time = config['DETECTOR']['Time_Limit']
 acq_mode = config['DETECTOR']['Time_Type']
-file_pre = config['DATA']['File_Pre']
-file_post = config['DATA']['File_Post']
+file_pre = config['DATA']['File_Pre'].replace(' ', '_')
+file_post = config['DATA']['File_Post'].replace(' ', '_')
 file_chunk = config['DATA']['File_Chunk']
 det_name = config['DETECTOR']['Name']
 det_serial = config['DETECTOR']['Sn']
 file_note1 = config['DATA']['File_Note1']
 file_note2 = config['DATA']['File_Note2']
-
 
 # Set up file naming structure
 # Time and date strings for filename
