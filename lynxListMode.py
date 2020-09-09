@@ -88,6 +88,8 @@ config.read(args.config)
 lynx_ip = config['LYNX']['Ip']
 lynx_user = config['LYNX']['User']
 lynx_pw = config['LYNX']['Pw']
+control_hv = config['LYNX']['Control_Hv']
+control_hv = True if control_hv.lower() == 'true' else False    # Default to False for malformed parm in cfg file
 det_voltage = config['DETECTOR']['Hv']
 acq_time = config['DETECTOR']['Time_Limit']
 acq_mode = config['DETECTOR']['Time_Type']
@@ -126,11 +128,21 @@ try:
     device.lock(lynx_user, lynx_pw, LYNXINPUT)  # Take over ownership of device
     device.control(CommandCodes.Stop, LYNXINPUT)  # Stop any running acquisition
     device.control(CommandCodes.Abort, LYNXINPUT)
-    device.setParameter(ParameterCodes.Input_Voltage, det_voltage, LYNXINPUT)  # Set HV magnitude
-    device.setParameter(ParameterCodes.Input_VoltageStatus, POLARITY_NEG, LYNXINPUT)  # Turn on HV
-    while device.getParameter(ParameterCodes.Input_VoltageRamping, LYNXINPUT) is True:  # Wait for HV to ramp
-        log.warn('HVPS is ramping...')
-        time.sleep(.5)
+    if control_hv:
+        log.info(f'Turning on HV, magnitude: {det_voltage}')
+        device.setParameter(ParameterCodes.Input_Voltage, det_voltage, LYNXINPUT)  # Set HV magnitude
+        device.setParameter(ParameterCodes.Input_VoltageStatus, POLARITY_NEG, LYNXINPUT)  # Turn on HV
+        while device.getParameter(ParameterCodes.Input_VoltageRamping, LYNXINPUT) is True:  # Wait for HV to ramp
+            log.warn('HVPS is ramping...')
+            time.sleep(.5)
+        read_hv = device.getParameter(ParameterCodes.Input_Voltage, LYNXINPUT)
+    else:
+        read_hv = device.getParameter(ParameterCodes.Input_Voltage, LYNXINPUT)
+        status_hv = device.getParameter(ParameterCodes.Input_VoltageStatus, LYNXINPUT)
+        log.info(f'Using preset HV setting: {read_hv}')
+        if not status_hv:
+            log.erro(f'Lynx high voltage supply is currently set to OFF - aborting acquisition.')
+            exit(-1)
     device.setParameter(ParameterCodes.Input_Mode, InputModes.Tlist, LYNXINPUT)  # set Tlist acquisition mode
     device.setParameter(ParameterCodes.Input_ExternalSyncStatus, 0, LYNXINPUT)  # Disable external sync
     if acq_mode == 'Live':  # Set up acquisition time and type
@@ -164,7 +176,7 @@ try:
     log.info(f'Opening info file : {iname}')
     ifile.write(f'Note 1: {file_note1}\n')
     ifile.write(f'Note 2: {file_note2}\n')
-    ifile.write(f'Detector: {det_name}, s/n: {det_serial}, voltage: {det_voltage}\n')
+    ifile.write(f'Detector: {det_name}, s/n: {det_serial}, voltage: {read_hv}\n')
     ifile.write(f'Calibration: {energy_offset} {energy_slope}\n')
     ifile.write('Files written:\n--------------\n')
     ifile.close()   # No need to leave open until writing data
