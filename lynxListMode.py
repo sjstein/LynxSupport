@@ -21,7 +21,7 @@ LYNXINPUT = 1  # Memory bank 1 (MCA)
 POLARITY_NEG = True
 POLARITY_POS = False
 LYNXMEMORYGROUP = 1
-COL_HEADER = 'T_us,ch\n'
+COL_HEADER = 'TimeStamp,T_us,ch\n'
 
 
 def output_tlist(td, time_base, clear, fn):
@@ -49,7 +49,7 @@ def output_tlist(td, time_base, clear, fn):
         RolloverTime = 0
         time_acc = 0
 
-    time_conversion = time_base / 1000  # Conversion to uS
+    time_conversion = time_base / 10e8  # Conversion to seconds
 
     nbr_events = len(td.getEvents())
 
@@ -67,9 +67,11 @@ def output_tlist(td, time_base, clear, fn):
             tc_msb |= event_nbr << 30  # During rollover, event_nbr has time info instead of event number
             RolloverTime = tc_msb | tc_lsb  # Adjust our clock for larger time
             continue  # goto next event, do not record this rollover
-        locdatestr = datetime.now().strftime('%Y%m%d')
-        loctimestr = datetime.now().strftime('%H:%M:%S.%f')
-        fn.write(f'{round(event_time * time_conversion, 1)},{event_nbr},{locdatestr} {loctimestr}\n')
+        now = datetime.datetime.now()
+        locdatestr = now.strftime('%Y%m%d')
+        loctimestr = now.strftime('%H:%M:%S')
+        fn.write(f'{locdatestr} {loctimestr},{round(event_time * time_conversion, 7)},{event_nbr}\n')
+        # fn.write(f'{locdatestr} {loctimestr},{event_time * time_conversion},{event_nbr}\n')
         time_acc += event_dt & ROLLOVERMASK
     return nbr_events  # Indicate the number of events processed
 # End function definition
