@@ -67,8 +67,9 @@ def output_tlist(td, time_base, clear, fn):
             tc_msb |= event_nbr << 30  # During rollover, event_nbr has time info instead of event number
             RolloverTime = tc_msb | tc_lsb  # Adjust our clock for larger time
             continue  # goto next event, do not record this rollover
-
-        fn.write(f'{round(event_time * time_conversion, 1)},{event_nbr}\n')
+        locdatestr = datetime.now().strftime('%Y%m%d')
+        loctimestr = datetime.now().strftime('%H:%M:%S.%f')
+        fn.write(f'{round(event_time * time_conversion, 1)},{event_nbr},{locdatestr} {loctimestr}\n')
         time_acc += event_dt & ROLLOVERMASK
     return nbr_events  # Indicate the number of events processed
 # End function definition
